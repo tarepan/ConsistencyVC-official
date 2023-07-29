@@ -1,3 +1,5 @@
+"""Train the ConsistencyVC XVC model."""
+
 import os
 import json
 import argparse

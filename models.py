@@ -13,6 +13,7 @@ from commons import init_weights, get_padding
 
 
 class ResidualCouplingBlock(nn.Module):
+  """NOTE: Totally same as QuickVC."""
   def __init__(self,
       channels,
       hidden_channels,
@@ -46,6 +47,7 @@ class ResidualCouplingBlock(nn.Module):
 
 
 class Encoder(nn.Module):
+  """NOTE: Totally same as QuickVC."""
   def __init__(self,
       in_channels,
       out_channels,
@@ -133,6 +135,7 @@ class Generator(torch.nn.Module):
 
 
 class DiscriminatorP(torch.nn.Module):
+    """NOTE: Totally same as QuickVC."""
     def __init__(self, period, kernel_size=5, stride=3, use_spectral_norm=False):
         super(DiscriminatorP, self).__init__()
         self.period = period
@@ -170,6 +173,7 @@ class DiscriminatorP(torch.nn.Module):
 
 
 class DiscriminatorS(torch.nn.Module):
+    """NOTE: Totally same as QuickVC."""
     def __init__(self, use_spectral_norm=False):
         super(DiscriminatorS, self).__init__()
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
@@ -198,6 +202,7 @@ class DiscriminatorS(torch.nn.Module):
 
 
 class MultiPeriodDiscriminator(torch.nn.Module):
+    """NOTE: Totally same as QuickVC."""
     def __init__(self, use_spectral_norm=False):
         super(MultiPeriodDiscriminator, self).__init__()
         periods = [2,3,5,7,11]
@@ -223,6 +228,7 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         
         
 class SpeakerEncoder(torch.nn.Module):
+    """NOTE: Totally same as QuickVC."""
     def __init__(self, mel_n_channels=80, model_num_layers=3, model_hidden_size=256, model_embedding_size=256):
         super(SpeakerEncoder, self).__init__()
         self.lstm = nn.LSTM(mel_n_channels, model_hidden_size, model_num_layers, batch_first=True)
@@ -267,6 +273,12 @@ class SpeakerEncoder(torch.nn.Module):
 class SynthesizerTrn(nn.Module):
   """
   Synthesizer for Training
+
+  NOTE: Basically same as QuickVC. Diffs are:
+        - Flexible dim_feat_unit size (ssl_dim)
+        - Decoder is changed, and it affects output variables
+        - (Not used) `use_spk` flag
+        - Embedding method at inference
   """
 
   def __init__(self, 
@@ -325,27 +337,22 @@ class SynthesizerTrn(nn.Module):
       spec_lengths = (torch.ones(spec.size(0)) * spec.size(-1)).to(spec.device)
       
     if not self.use_spk:
-      #print(torch.max(mel),torch.min(mel),mel.size())
       g_raw = self.enc_spk(mel.transpose(1,2))
     g = g_raw.unsqueeze(-1)
       
     _, m_p, logs_p, _ = self.enc_p(c, c_lengths)#这里也输入一下g会不会更好?models_g_content.py里面有模型代码
     z, m_q, logs_q, spec_mask = self.enc_q(spec, spec_lengths, g=g) 
     z_p = self.flow(z, spec_mask, g=g)
-    #print(z.size(),spec_lengths, self.segment_size)
     z_slice, ids_slice = commons.rand_slice_segments(z, spec_lengths, self.segment_size)
-    #print(z_slice.size())
     o = self.dec(z_slice, g=g)
-    #with torch.no_grad():
-    #   g_hat = self.enc_spk(mel.transpose(1,2))
     
-    return o, ids_slice, spec_mask, (z, z_p, m_p, logs_p, m_q, logs_q),g_raw#,g_hat
+    return o, ids_slice, spec_mask, (z, z_p, m_p, logs_p, m_q, logs_q), g_raw #,g_hat
 
   def infer(self, c, g=None, mel=None, c_lengths=None):
     if c_lengths == None:
       c_lengths = (torch.ones(c.size(0)) * c.size(-1)).to(c.device)
     if not self.use_spk:
-      #g = self.enc_spk.embed_utterance(mel.transpose(1,2))
+      # NOTE: QuickVC `enc_spk.embed_utterance()` -> ConsistencyVC `self.enc_spk()`
       g = self.enc_spk(mel.transpose(1,2))
     g = g.unsqueeze(-1)
 
