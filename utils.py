@@ -53,6 +53,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, strict=False):
   assert os.path.isfile(checkpoint_path)
   checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
   iteration = checkpoint_dict['iteration']
+  global_step = checkpoint_dict.get("global_step")
   learning_rate = checkpoint_dict['learning_rate']
   if optimizer is not None:
     optimizer.load_state_dict(checkpoint_dict['optimizer'])
@@ -74,12 +75,11 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, strict=False):
     model.module.load_state_dict(new_state_dict)
   else:
     model.load_state_dict(new_state_dict)
-  logger.info("Loaded checkpoint '{}' (iteration {})" .format(
-    checkpoint_path, iteration))
-  return model, optimizer, learning_rate, iteration
+  logger.info(f"Loaded checkpoint '{checkpoint_path}' (iteration {iteration}, global_step {global_step})")
+  return iteration, global_step
 
 
-def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path):
+def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path, global_step: int):
   logger.info("Saving model and optimizer state at iteration {} to {}".format(
     iteration, checkpoint_path))
   if hasattr(model, 'module'):
@@ -89,7 +89,9 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
   torch.save({'model': state_dict,
               'iteration': iteration,
               'optimizer': optimizer.state_dict(),
-              'learning_rate': learning_rate}, checkpoint_path)
+              'learning_rate': learning_rate,
+              'global_step': global_step,
+             }, checkpoint_path)
 
 
 def summarize(writer, global_step, scalars={}, histograms={}, images={}, audios={}, audio_sampling_rate=22050):

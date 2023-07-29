@@ -31,7 +31,7 @@ if __name__ == "__main__":
         **hps.model).cuda()
     _ = net_g.eval()
     print("Loading checkpoint...")
-    _ = utils.load_checkpoint(args.ptfile, net_g, None, True)
+    utils.load_checkpoint(args.ptfile, net_g, None, True)
 
     src_wavs=[r".\dataset\ESD16k\0011\Neutral\evaluation\0011_000004.wav",
              r".\dataset\ESD16k\0016\Neutral\test\0016_000031.wav"]

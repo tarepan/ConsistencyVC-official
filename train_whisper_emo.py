@@ -62,9 +62,9 @@ def run(hps):
   optim_g = torch.optim.AdamW(net_g.parameters(), hps.train.learning_rate, betas=hps.train.betas, eps=hps.train.eps)
   optim_d = torch.optim.AdamW(net_d.parameters(), hps.train.learning_rate, betas=hps.train.betas, eps=hps.train.eps)
   try:
-    _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g)
-    _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d)
-    global_step = (epoch_str - 1) * len(train_loader)
+    epoch_str, global_step = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g)
+    epoch_str, global_step = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d)
+    assert global_step is not None, "New training must support `global_step` checkpoint."
   except:
     epoch_str = 1
     global_step = 0
@@ -169,8 +169,8 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
       # Evaluation
       evaluate(hps, net_g, eval_loader, writer_eval)
       # Checkpointing
-      utils.save_checkpoint(net_g, optim_g, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, f"G_{global_step}.pth"))
-      utils.save_checkpoint(net_d, optim_d, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, f"D_{global_step}.pth"))
+      utils.save_checkpoint(net_g, optim_g, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, f"G_{global_step}.pth"), global_step)
+      utils.save_checkpoint(net_d, optim_d, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, f"D_{global_step}.pth"), global_step)
 
     global_step += 1
     # ==== /step ========================================================================================================================================
