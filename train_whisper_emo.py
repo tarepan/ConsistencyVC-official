@@ -11,11 +11,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 print("import tensorboard")
 from torch.utils.tensorboard import SummaryWriter
-#import torch.multiprocessing as mp
-#import torch.distributed as dist
-#from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.cuda.amp import autocast, GradScaler
-#带情感loss，用whisper作为内容特征#python train_whisper_emo.py -c configs/freevc-whispers-three-emo.json -m freevc-whispers-three-emo
 import commons
 import utils
 from data_utils_whisper import (
@@ -37,7 +33,6 @@ from mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 
 torch.backends.cudnn.benchmark = True
 global_step = 0
-#os.environ['TORCH_DISTRIBUTED_DEBUG'] = 'INFO'
 
 
 def main():
@@ -46,11 +41,8 @@ def main():
   hps = utils.get_hparams()
 
   n_gpus = torch.cuda.device_count()
-  #os.environ['MASTER_ADDR'] = 'localhost'
-  #os.environ['MASTER_PORT'] = hps.train.port
   print("start run")
   run(0,n_gpus, hps)
-  #mp.spawn(run, nprocs=n_gpus, args=(n_gpus, hps,))
 
 
 def run(rank, n_gpus, hps):
@@ -62,7 +54,6 @@ def run(rank, n_gpus, hps):
     writer = SummaryWriter(log_dir=hps.model_dir)
     writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
 
-  #dist.init_process_group(backend='nccl', init_method='env://', world_size=n_gpus, rank=rank)
   torch.manual_seed(hps.train.seed)
   torch.cuda.set_device(rank)
 
@@ -98,8 +89,6 @@ def run(rank, n_gpus, hps):
       hps.train.learning_rate, 
       betas=hps.train.betas, 
       eps=hps.train.eps)
-  #net_g = DDP(net_g, device_ids=[rank])#, find_unused_parameters=True)
-  #net_d = DDP(net_d, device_ids=[rank])
 
   try:
     _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g)
@@ -163,11 +152,9 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
           hps.data.mel_fmin, 
           hps.data.mel_fmax
       )
-    #print(torch.max(mel),torch.min(mel),torch.max(real_mel),torch.min(real_mel))
     with autocast(enabled=hps.train.fp16_run):
       y_hat, ids_slice, z_mask,\
       (z, z_p, m_p, logs_p, m_q, logs_q),emo_y = net_g(c, spec, g=g, mel=mel)
-      #print(torch.max(y),torch.min(y),torch.max(y_hat),torch.min(y_hat))
       y_mel = commons.slice_segments(mel, ids_slice, hps.train.segment_size // hps.data.hop_length)
       y_hat_mel = mel_spectrogram_torch(
           y_hat.squeeze(1), 
@@ -195,24 +182,16 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
     with autocast(enabled=hps.train.fp16_run):
       # Generator
       y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(y, y_hat)
-      #print(torch.max(mel),torch.min(mel),mel.size(),torch.max(y_hat_mel),torch.min(y_hat_mel),y_hat_mel.size())
       #y_hat_mel=torch.rand_like(y_hat_mel)
       #emo_y_hat=net_g.enc_spk(y_hat_mel.transpose(1,2))#process_func(y_input=y_hat,embeddings=True)
       #y=torch.rand_like(y)
       emo_y_hat=net_g.enc_spk(y_hat_mel.transpose(1,2))#process_func(y_input=y,embeddings=True)
-      #print(torch.max(emo_y),torch.min(emo_y),emo_y.size(),torch.max(emo_y_hat),torch.min(emo_y_hat),emo_y_hat.size())
-      #print(emo_y_hat.size(),emo_y.size())
       with autocast(enabled=False):
         loss_mel = F.l1_loss(y_hat_mel, y_mel) * hps.train.c_mel
-        #print("loss_mel",loss_mel)
         loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * hps.train.c_kl
-        #print("loss_kl",loss_kl)
         loss_fm = feature_loss(fmap_r, fmap_g) * 0.5
-        #print("loss_fm",loss_fm)
         loss_gen, losses_gen = generator_loss(y_d_hat_g)
-        #print("loss_gen, losses_gen",loss_gen, losses_gen)
         loss_emo=F.l1_loss(emo_y_hat,emo_y) * hps.train.c_mel * 0.5
-        #print("loss_emo",loss_emo)
         loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl + loss_emo
     optim_g.zero_grad()
     scaler.scale(loss_gen_all).backward()
@@ -277,7 +256,7 @@ def evaluate(hps, generator, eval_loader, writer_eval):
         hps.data.sampling_rate,
         hps.data.mel_fmin, 
         hps.data.mel_fmax)
-      y_hat = generator.infer(c, g=g, mel=mel)#generator.module.infer(c, g=g, mel=mel)
+      y_hat = generator.infer(c, g=g, mel=mel)
       print(torch.max(y_hat),torch.min(y_hat))
       y_hat_mel = mel_spectrogram_torch(
         y_hat.squeeze(1).float(),
