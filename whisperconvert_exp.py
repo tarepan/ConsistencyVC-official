@@ -30,13 +30,14 @@ if __name__ == "__main__":
     parser.add_argument("--hpfile",     type=str, default="./logs/cvc-whispers-three-emo-loss/config.json",                       help="path to json config file")
     parser.add_argument("--ptfile",     type=str, default="./logs/cvc-whispers-three-emo-loss/G_cvc-whispers-three-emo-loss.pth", help="path to pth file")
     parser.add_argument("--outdir",     type=str, default="./output/XVC",                                                         help="path to output dir")
+    parser.add_argument("--device",     type=str, default="cuda",                                                                  help="inference device")
     args = parser.parse_args()
     
     os.makedirs(args.outdir, exist_ok=True)
     hps = utils.get_hparams_from_file(args.hpfile)
 
     print("Loading model & checkpoint...")
-    net_g = SynthesizerTrn(hps.data.filter_length // 2 + 1, hps.train.segment_size // hps.data.hop_length, **hps.model).cuda()
+    net_g = SynthesizerTrn(hps.data.filter_length // 2 + 1, hps.train.segment_size // hps.data.hop_length, **hps.model).to(args.device)
     net_g.eval()
     utils.load_checkpoint(args.ptfile, net_g, None, True)
 
@@ -68,8 +69,8 @@ if __name__ == "__main__":
             # Load
             wav_src_npy = librosa.load(src, sr=hps.data.sampling_rate)[0]
             wav_tgt_npy = librosa.load(tgt, sr=hps.data.sampling_rate)[0]
-            wav_tgt = torch.from_numpy(wav_tgt_npy).unsqueeze(0).cuda()
-            c = torch.from_numpy(np.load(c_filename)).transpose(1,0).unsqueeze(0).cuda()
+            wav_tgt = torch.from_numpy(wav_tgt_npy).unsqueeze(0).to(args.device)
+            c = torch.from_numpy(np.load(c_filename)).transpose(1,0).unsqueeze(0).to(args.device)
 
             # Inference
             mel_tgt = mel_spectrogram_torch(wav_tgt,
