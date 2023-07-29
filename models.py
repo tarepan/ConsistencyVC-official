@@ -274,10 +274,10 @@ class SynthesizerTrn(nn.Module):
   """
   Synthesizer for Training
 
-  NOTE: Basically same as QuickVC. Diffs are:
+  NOTE: Differences from QuickVC are:
         - Flexible dim_feat_unit size (ssl_dim)
         - Decoder is changed, and it affects output variables
-        - (Not used) `use_spk` flag
+        - Return embedding
         - Embedding method at inference
   """
 
@@ -346,6 +346,7 @@ class SynthesizerTrn(nn.Module):
     z_slice, ids_slice = commons.rand_slice_segments(z, spec_lengths, self.segment_size)
     o = self.dec(z_slice, g=g)
     
+    # NOTE: QuickVC 'no embedding return' -> ConsistencyVC `return ..., g_raw`
     return o, ids_slice, spec_mask, (z, z_p, m_p, logs_p, m_q, logs_q), g_raw #,g_hat
 
   def infer(self, c, g=None, mel=None, c_lengths=None):
