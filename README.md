@@ -24,7 +24,7 @@ The audio needs to be 16KHz for train and inference.
 ### Inference
 
 #### XVC (WEO unit)
-1. Run `preprocess_ppg.py`, generate the WEO of the source speech in [src](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/467ed5e632b2b328d01c87cb73e92b26b36deb05/whisperconvert_exp.py#L39C1-L39C1).
+1. Run `generate_weo.py`, the source speech in [src](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/467ed5e632b2b328d01c87cb73e92b26b36deb05/whisperconvert_exp.py#L39C1-L39C1).
 2. Copy the root of the reference speech to [tgt](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/467ed5e632b2b328d01c87cb73e92b26b36deb05/whisperconvert_exp.py#L47)
 3. Run `whisperconvert_exp.py`
 
@@ -35,9 +35,9 @@ For ConsistencyEVC, use ppgemoconvert_exp.py to achieve voice conversion using p
 ### Train
 
 #### XVC (WEO unit)
-Use preprocess_ppg.py to generate the WEO.
+1. Preprocessing by running `generate_weo.py`.
 
-First, train w/o speaker consistency loss for 100k steps:
+2. train w/o speaker consistency loss for 100k steps:
 
 change [this line](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/b5e8e984dffd5a12910d1846e25b128298933e40/train_whisper_emo.py#L214C11-L214C11) to 
 
@@ -51,7 +51,7 @@ run the py file:
 python train_whisper_emo.py -c configs/cvc-whispers-multi.json     -m cvc-whispers-three
 ```
 
-Then, finetune w/ speaker consistency loss:
+3. finetune w/ speaker consistency loss:
 
 change [this line](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/71cf17a5b65c12987ea7fba74d1d173ea1aae5cb/train_whisper_emo.py#L214) back to 
 
@@ -62,9 +62,9 @@ python train_whisper_emo.py -c configs/cvc-whispers-three-emo.json -m cvc-whispe
 ```
 
 #### EVC (PPG)
-Use ppg.py to generate the PPG.
+1. Preprocessing by running `generate_ppg.py`
 
-First, train w/o speaker consistency loss for 100k steps:
+2. train w/o speaker consistency loss for 100k steps:
 
 change [this line](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/71cf17a5b65c12987ea7fba74d1d173ea1aae5cb/train_eng_ppg_emo_loss.py#L311) to 
 
@@ -78,7 +78,7 @@ run the py file:
 python train_eng_ppg_emo_loss.py -c configs/cvc-eng-ppgs-three-emo.json -m cvc-eng-ppgs-three-emo
 ```
 
-Then, finetune w/ speaker consistency loss:
+3. finetune w/ speaker consistency loss:
 
 change [this line](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/71cf17a5b65c12987ea7fba74d1d173ea1aae5cb/train_eng_ppg_emo_loss.py#L311) back to 
 
