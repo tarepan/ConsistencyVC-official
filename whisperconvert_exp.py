@@ -44,8 +44,8 @@ if __name__ == "__main__":
     # List up conversion pairs
     with open(args.srctgtfile) as f:
         src_tgt = json.load(f)
-    src_wavs = src_tgt.srcs
-    tgt_wavs = src_tgt.tgts
+    src_wavs = src_tgt["srcs"]
+    tgt_wavs = src_tgt["tgts"]
     titles: list[str] = [] # Conversion names
     srcs:   list[str] = [] # Source audio file paths
     tgts:   list[str] = [] # Target audio file paths
