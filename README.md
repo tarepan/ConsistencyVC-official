@@ -24,9 +24,9 @@ The audio needs to be 16KHz for train and inference.
 ### Inference
 
 #### XVC (WEO unit)
-1. Run `generate_weo.py`, the source speech in [src](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/467ed5e632b2b328d01c87cb73e92b26b36deb05/whisperconvert_exp.py#L39C1-L39C1).
-2. Copy the root of the reference speech to [tgt](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/467ed5e632b2b328d01c87cb73e92b26b36deb05/whisperconvert_exp.py#L47)
-3. Run `whisperconvert_exp.py`
+1. Prepare the directory containing audios and the corresponding `src_tgt.json`
+2. Run `pyhon generate_weo.py --audiodir=<dir_audio_root> --model=<path/to/medium.pt>`
+3. Run `whisperconvert_exp.py --srctgtfile=<path/to/src_tgt.json> --hpfile=<path/to/config.json> --ptfile=<path/to/G_cvc-whispers-three-emo-loss.pth>`
 
 #### EVC (PPG)
 

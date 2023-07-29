@@ -1,0 +1,21 @@
+{
+    "srcs": [
+        "./dataset/crosslingual_emo_dataset/LibriTTS100/911/128684/911_128684_000004_000001.wav",
+        "./dataset/crosslingual_emo_dataset/LibriTTS100/730/359/730_359_000004_000001.wav",
+        "./dataset/crosslingual_emo_dataset/aishell3/wav/SSB0246/SSB02460001.wav",
+        "./dataset/crosslingual_emo_dataset/aishell3/wav/SSB1863/SSB18630001.wav",
+        "./dataset/crosslingual_emo_dataset/jvs/jvs003/nonpara30/wav24kHz16bit/BASIC5000_0440.wav",
+        "./dataset/crosslingual_emo_dataset/jvs/jvs014/nonpara30/wav24kHz16bit/BASIC5000_0318.wav"
+    ],
+    "tgts": [
+        "./dataset/crosslingual_emo_dataset/LibriTTS100/27/123349/27_123349_000003_000002.wav",
+        "./dataset/crosslingual_emo_dataset/LibriTTS100/87/121553/87_121553_000254_000000.wav",
+        "./dataset/crosslingual_emo_dataset/aishell3/wav/SSB1935/SSB19350001.wav",
+        "./dataset/crosslingual_emo_dataset/aishell3/wav/SSB1759/SSB17590008.wav",
+        "./dataset/crosslingual_emo_dataset/jvs/jvs009/nonpara30/wav24kHz16bit/BASIC5000_0155.wav",
+        "./dataset/crosslingual_emo_dataset/jvs/jvs010/nonpara30/wav24kHz16bit/BASIC5000_0113.wav",
+        "./dataset/vctk-16k/p304/p304_007.wav",
+        "./jecs_ref/JECS0000_JA.wav",
+        "./aishell1_ref/BAC009S0655W0493.wav"
+    ]
+}

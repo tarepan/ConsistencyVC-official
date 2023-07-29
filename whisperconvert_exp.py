@@ -3,6 +3,7 @@
 import os
 import argparse
 import time
+import json
 import logging
 logging.getLogger('numba').setLevel(logging.WARNING)
 
@@ -25,9 +26,10 @@ if __name__ == "__main__":
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hpfile", type=str, default="./logs/cvc-whispers-three-emo-loss/config.json",                       help="path to json config file")
-    parser.add_argument("--ptfile", type=str, default="./logs/cvc-whispers-three-emo-loss/G_cvc-whispers-three-emo-loss.pth", help="path to pth file")
-    parser.add_argument("--outdir", type=str, default="output/60_exp_crosslingual_whispers-three-emo-loss",                   help="path to output dir")
+    parser.add_argument("--srctgtfile", type=str, default="./src_tgt.json",                                                       help="path to json src/tgt file")
+    parser.add_argument("--hpfile",     type=str, default="./logs/cvc-whispers-three-emo-loss/config.json",                       help="path to json config file")
+    parser.add_argument("--ptfile",     type=str, default="./logs/cvc-whispers-three-emo-loss/G_cvc-whispers-three-emo-loss.pth", help="path to pth file")
+    parser.add_argument("--outdir",     type=str, default="./output/XVC",                                                         help="path to output dir")
     args = parser.parse_args()
     
     os.makedirs(args.outdir, exist_ok=True)
@@ -39,21 +41,10 @@ if __name__ == "__main__":
     utils.load_checkpoint(args.ptfile, net_g, None, True)
 
     # List up conversion pairs
-    src_wavs=[r".\dataset\crosslingual_emo_dataset\LibriTTS100\911\128684\911_128684_000004_000001.wav",
-             r".\dataset\crosslingual_emo_dataset\LibriTTS100\730\359\730_359_000004_000001.wav",
-             r".\dataset\crosslingual_emo_dataset\aishell3\wav\SSB0246\SSB02460001.wav",
-             r".\dataset\crosslingual_emo_dataset\aishell3\wav\SSB1863\SSB18630001.wav",
-             r".\dataset\crosslingual_emo_dataset\jvs\jvs003\nonpara30\wav24kHz16bit\BASIC5000_0440.wav",
-             r".\dataset\crosslingual_emo_dataset\jvs\jvs014\nonpara30\wav24kHz16bit\BASIC5000_0318.wav"]
-    tgt_wavs=[r".\dataset\crosslingual_emo_dataset\LibriTTS100\27\123349\27_123349_000003_000002.wav",
-             r".\dataset\crosslingual_emo_dataset\LibriTTS100\87\121553\87_121553_000254_000000.wav",
-             r".\dataset\crosslingual_emo_dataset\aishell3\wav\SSB1935\SSB19350001.wav",
-             r".\dataset\crosslingual_emo_dataset\aishell3\wav\SSB1759\SSB17590008.wav",
-             r".\dataset\crosslingual_emo_dataset\jvs\jvs009\nonpara30\wav24kHz16bit\BASIC5000_0155.wav",
-             r".\dataset\crosslingual_emo_dataset\jvs\jvs010\nonpara30\wav24kHz16bit\BASIC5000_0113.wav",
-             r".\dataset\vctk-16k\p304\p304_007.wav",
-             r".\jecs_ref\JECS0000_JA.wav",
-             r".\aishell1_ref\BAC009S0655W0493.wav"]
+    with open(args.srctgtfile) as f:
+        src_tgt = json.load(f)
+    src_wavs = src_tgt.srcs
+    tgt_wavs = src_tgt.tgts
     titles: list[str] = [] # Conversion names
     srcs:   list[str] = [] # Source audio file paths
     tgts:   list[str] = [] # Target audio file paths

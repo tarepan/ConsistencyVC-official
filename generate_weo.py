@@ -52,13 +52,17 @@ if __name__ == "__main__":
         - .wav files under the `data_dir` directory
     """
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--audiodir", type=str, default="./data", help="Audio directory")
+    parser.add_argument("--model",    type=str, default="./consistencyvc_official/medium.pt", help="Audio directory")
+    args = parser.parse_args()
+    
     # List up all .wav files under the `data_dir`
-    data_dir = r".\dataset\crosslingual_emo_dataset\jvs"
-    wav_files = glob(os.path.join(data_dir, '**', '*.wav'), recursive=True)
+    wav_files = glob(os.path.join(args.audiodir, '**', '*.wav'), recursive=True)
     wav_files = sorted(wav_files)
 
     # Load the model
-    whisper = load_model(os.path.join("whisper_pretrain", "medium.pt"))
+    whisper = load_model(args.model)
 
     # Run preprocessing
     for p_wav in tqdm(wav_files):
