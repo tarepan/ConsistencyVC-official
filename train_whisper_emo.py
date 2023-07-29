@@ -38,6 +38,7 @@ def run(hps):
   global global_step
 
   # Init
+  assert hps.model.use_spk is False, "use_spk is deprecated."
   logger = utils.get_logger(hps.model_dir)
   logger.info(hps)
   utils.check_git_hash(hps.model_dir)
@@ -97,20 +98,15 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
     # ==== step =========================================================================================================================================
 
     # Data
-    if hps.model.use_spk:
-      c, spec, y, spk = items
-      g = spk.cuda(non_blocking=True)
-    else:
-      c, spec, y = items
-      g = None
-    spec, y, c = spec.cuda(non_blocking=True), y.cuda(non_blocking=True), c.cuda(non_blocking=True)
+    c, spec, y = items
+    c, spec, y = c.cuda(non_blocking=True), spec.cuda(non_blocking=True), y.cuda(non_blocking=True)
 
     # Transform
     mel = spec_to_mel_torch(spec, hps.data.filter_length, hps.data.n_mel_channels, hps.data.sampling_rate,hps.data.mel_fmin, hps.data.mel_fmax)
     real_mel = mel_spectrogram_torch(y.squeeze(1),
       hps.data.filter_length, hps.data.n_mel_channels, hps.data.sampling_rate, hps.data.hop_length, hps.data.win_length, hps.data.mel_fmin, hps.data.mel_fmax)
     with autocast(enabled=hps.train.fp16_run):
-      y_hat, ids_slice, z_mask, (z, z_p, m_p, logs_p, m_q, logs_q), emo_y = net_g(c, spec, g=g, mel=mel)
+      y_hat, ids_slice, z_mask, (z, z_p, m_p, logs_p, m_q, logs_q), emo_y = net_g(c, spec, g=None, mel=mel)
       y_mel = commons.slice_segments(mel, ids_slice, hps.train.segment_size // hps.data.hop_length)
       y_hat_mel = mel_spectrogram_torch(y_hat.squeeze(1),
           hps.data.filter_length, hps.data.n_mel_channels, hps.data.sampling_rate, hps.data.hop_length, hps.data.win_length, hps.data.mel_fmin, hps.data.mel_fmax)
@@ -185,18 +181,14 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
 def evaluate(hps, generator, eval_loader, writer_eval):
     generator.eval()
     with torch.no_grad():
+      # Data
       for batch_idx, items in enumerate(eval_loader):
-        if hps.model.use_spk:
-          c, spec, y, spk = items
-          g = spk[:1].cuda(0)
-        else:
-          c, spec, y = items
-          g = None
-        spec, y = spec[:1].cuda(0), y[:1].cuda(0)
-        c = c[:1].cuda(0)
+        c, spec, y = items
+        c, spec, y = c[:1].cuda(), spec[:1].cuda(), y[:1].cuda()
         break
+      # Transform
       mel = spec_to_mel_torch(spec, hps.data.filter_length, hps.data.n_mel_channels, hps.data.sampling_rate, hps.data.mel_fmin, hps.data.mel_fmax)
-      y_hat = generator.infer(c, g=g, mel=mel)
+      y_hat = generator.infer(c, g=None, mel=mel)
       y_hat_mel = mel_spectrogram_torch(y_hat.squeeze(1).float(),
         hps.data.filter_length, hps.data.n_mel_channels, hps.data.sampling_rate, hps.data.hop_length, hps.data.win_length, hps.data.mel_fmin, hps.data.mel_fmax)
     image_dict = {
