@@ -82,18 +82,18 @@ def run(hps):
 
 def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, logger, writers):
   
-  net_g, net_d = nets
-  optim_g, optim_d = optims
-  scheduler_g, scheduler_d = schedulers
+  net_g,        net_d       = nets
+  optim_g,      optim_d     = optims
+  scheduler_g,  scheduler_d = schedulers
   train_loader, eval_loader = loaders
-  if writers is not None:
-    writer, writer_eval = writers
+  writer,       writer_eval = writers
 
   train_loader.batch_sampler.set_epoch(epoch)
   global global_step
 
   net_g.train()
   net_d.train()
+
   for batch_idx, items in enumerate(train_loader):
     # ==== step =========================================================================================================================================
 
@@ -102,21 +102,23 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
     c, spec, y = c.cuda(non_blocking=True), spec.cuda(non_blocking=True), y.cuda(non_blocking=True)
 
     # Transform
-    mel = spec_to_mel_torch(spec, hps.data.filter_length, hps.data.n_mel_channels, hps.data.sampling_rate,hps.data.mel_fmin, hps.data.mel_fmax)
-    real_mel = mel_spectrogram_torch(y.squeeze(1),
-      hps.data.filter_length, hps.data.n_mel_channels, hps.data.sampling_rate, hps.data.hop_length, hps.data.win_length, hps.data.mel_fmin, hps.data.mel_fmax)
+    mel = spec_to_mel_torch(spec, hps.data.filter_length, hps.data.n_mel_channels, hps.data.sampling_rate, hps.data.mel_fmin, hps.data.mel_fmax)
+
     with autocast(enabled=hps.train.fp16_run):
-      y_hat, ids_slice, z_mask, (z, z_p, m_p, logs_p, m_q, logs_q), emo_y = net_g(c, spec, g=None, mel=mel)
-      y_mel = commons.slice_segments(mel, ids_slice, hps.train.segment_size // hps.data.hop_length)
+      # Common_Forward
+      y_hat, ids_slice, z_mask, (_, z_p, m_p, logs_p, _, logs_q), emo_y = net_g(c, spec, g=None, mel=mel)
       y_hat_mel = mel_spectrogram_torch(y_hat.squeeze(1),
           hps.data.filter_length, hps.data.n_mel_channels, hps.data.sampling_rate, hps.data.hop_length, hps.data.win_length, hps.data.mel_fmin, hps.data.mel_fmax)
-      y = commons.slice_segments(y, ids_slice * hps.data.hop_length, hps.train.segment_size) # slice 
+      y_mel = commons.slice_segments(mel, ids_slice, hps.train.segment_size // hps.data.hop_length)
 
-      # Discriminator
+      # D_Forward
+      y = commons.slice_segments(y, ids_slice * hps.data.hop_length, hps.train.segment_size)
       y_d_hat_r, y_d_hat_g, _, _ = net_d(y, y_hat.detach())
+      # D_Loss
       with autocast(enabled=False):
         loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(y_d_hat_r, y_d_hat_g)
         loss_disc_all = loss_disc
+    # D_Backward/Optim
     optim_d.zero_grad()
     scaler.scale(loss_disc_all).backward()
     scaler.unscale_(optim_d)
@@ -124,12 +126,10 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
     scaler.step(optim_d)
 
     with autocast(enabled=hps.train.fp16_run):
-      # Generator
-      y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(y, y_hat)
-      #y_hat_mel=torch.rand_like(y_hat_mel)
-      #emo_y_hat=net_g.enc_spk(y_hat_mel.transpose(1,2))#process_func(y_input=y_hat,embeddings=True)
-      #y=torch.rand_like(y)
-      emo_y_hat=net_g.enc_spk(y_hat_mel.transpose(1,2))#process_func(y_input=y,embeddings=True)
+      # G_Forward
+      _, y_d_hat_g, fmap_r, fmap_g = net_d(y, y_hat)
+      emo_y_hat = net_g.enc_spk(y_hat_mel.transpose(1,2))
+      # G_Loss
       with autocast(enabled=False):
         loss_gen, losses_gen = generator_loss(y_d_hat_g)
         loss_fm  = 0.5                   * feature_loss(fmap_r, fmap_g)
@@ -137,7 +137,7 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
         loss_kl  = hps.train.c_kl        * kl_loss(z_p, logs_q, m_p, logs_p, z_mask)
         loss_emo = 0.5 * hps.train.c_mel * F.l1_loss(emo_y_hat, emo_y)
         loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl + loss_emo
-    # Backward/Optim
+    # G_Backward/Optim
     optim_g.zero_grad()
     scaler.scale(loss_gen_all).backward()
     scaler.unscale_(optim_g)

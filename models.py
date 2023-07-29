@@ -336,6 +336,10 @@ class SynthesizerTrn(nn.Module):
     self.enc_spk = SpeakerEncoder(model_hidden_size=gin_channels, model_embedding_size=gin_channels)
 
   def forward(self, c, spec, g=None, mel=None, c_lengths=None, spec_lengths=None):
+    """
+    Returns:
+        g_raw - Embedding of ground-truth spectrogram
+    """
     if c_lengths == None:
       c_lengths = (torch.ones(c.size(0)) * c.size(-1)).to(c.device)
     if spec_lengths == None:
