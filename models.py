@@ -80,6 +80,10 @@ class Encoder(nn.Module):
 
 
 class Generator(torch.nn.Module):
+    """Basically HiFi-GAN.
+    
+    NOTE: QuickVC 'MSiSTFTNet' -> ConsistencyVC 'HiFi-GAN'
+    """
     def __init__(self, initial_channel, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=0):
         super(Generator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
