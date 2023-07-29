@@ -322,13 +322,14 @@ class SynthesizerTrn(nn.Module):
     self.ssl_dim = ssl_dim
     self.use_spk = use_spk
 
+    assert use_spk is False, "`use_spk=True` is deprecated."
+
     self.enc_p = Encoder(ssl_dim, inter_channels, hidden_channels, 5, 1, 16)
     self.dec = Generator(inter_channels, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=gin_channels)
     self.enc_q = Encoder(spec_channels, inter_channels, hidden_channels, 5, 1, 16, gin_channels=gin_channels) 
     self.flow = ResidualCouplingBlock(inter_channels, hidden_channels, 5, 1, 4, gin_channels=gin_channels)
     
-    if not self.use_spk:
-      self.enc_spk = SpeakerEncoder(model_hidden_size=gin_channels, model_embedding_size=gin_channels)
+    self.enc_spk = SpeakerEncoder(model_hidden_size=gin_channels, model_embedding_size=gin_channels)
 
   def forward(self, c, spec, g=None, mel=None, c_lengths=None, spec_lengths=None):
     if c_lengths == None:
@@ -336,8 +337,7 @@ class SynthesizerTrn(nn.Module):
     if spec_lengths == None:
       spec_lengths = (torch.ones(spec.size(0)) * spec.size(-1)).to(spec.device)
       
-    if not self.use_spk:
-      g_raw = self.enc_spk(mel.transpose(1,2))
+    g_raw = self.enc_spk(mel.transpose(1,2))
     g = g_raw.unsqueeze(-1)
       
     _, m_p, logs_p, _ = self.enc_p(c, c_lengths)#这里也输入一下g会不会更好?models_g_content.py里面有模型代码
@@ -351,9 +351,8 @@ class SynthesizerTrn(nn.Module):
   def infer(self, c, g=None, mel=None, c_lengths=None):
     if c_lengths == None:
       c_lengths = (torch.ones(c.size(0)) * c.size(-1)).to(c.device)
-    if not self.use_spk:
-      # NOTE: QuickVC `enc_spk.embed_utterance()` -> ConsistencyVC `self.enc_spk()`
-      g = self.enc_spk(mel.transpose(1,2))
+    # NOTE: QuickVC `enc_spk.embed_utterance()` -> ConsistencyVC `self.enc_spk()`
+    g = self.enc_spk(mel.transpose(1,2))
     g = g.unsqueeze(-1)
 
     z_p, m_p, logs_p, c_mask = self.enc_p(c, c_lengths)
