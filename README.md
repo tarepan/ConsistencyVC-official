@@ -22,12 +22,11 @@ The audio needs to be 16KHz for train and inference.
 
 
 ### Inference
-with the pre-trained models (use WEO as example)
 
 #### XVC (WEO unit)
-1. Generate the WEO of the source speech in [src](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/467ed5e632b2b328d01c87cb73e92b26b36deb05/whisperconvert_exp.py#L39C1-L39C1) by preprocess_ppg.py.
+1. Run `preprocess_ppg.py`, generate the WEO of the source speech in [src](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/467ed5e632b2b328d01c87cb73e92b26b36deb05/whisperconvert_exp.py#L39C1-L39C1).
 2. Copy the root of the reference speech to [tgt](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/467ed5e632b2b328d01c87cb73e92b26b36deb05/whisperconvert_exp.py#L47)
-3. Use whisperconvert_exp.py to achieve voice conversion using WEO as content information.
+3. Run `whisperconvert_exp.py`
 
 #### EVC (PPG)
 
