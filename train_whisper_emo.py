@@ -14,22 +14,11 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.cuda.amp import autocast, GradScaler
 import commons
 import utils
-from data_utils_whisper import (
-  TextAudioSpeakerLoader,
-  TextAudioSpeakerCollate,
-  DistributedBucketSampler
-)
-from models import (
-  SynthesizerTrn,
-  MultiPeriodDiscriminator,
-)
-from losses import (
-  generator_loss,
-  discriminator_loss,
-  feature_loss,
-  kl_loss
-)
+from data_utils_whisper import TextAudioSpeakerLoader, TextAudioSpeakerCollate, DistributedBucketSampler
+from models import SynthesizerTrn, MultiPeriodDiscriminator
+from losses import generator_loss, discriminator_loss, feature_loss, kl_loss
 from mel_processing import mel_spectrogram_torch, spec_to_mel_torch
+
 
 torch.backends.cudnn.benchmark = True
 global_step = 0
@@ -40,45 +29,39 @@ def main():
   assert torch.cuda.is_available(), "CPU training is not allowed."
   hps = utils.get_hparams()
 
-  n_gpus = torch.cuda.device_count()
   print("start run")
-  run(0,n_gpus, hps)
+  run(hps)
 
 
-def run(rank, n_gpus, hps):
+def run(hps):
   global global_step
-  if rank == 0:
-    logger = utils.get_logger(hps.model_dir)
-    logger.info(hps)
-    utils.check_git_hash(hps.model_dir)
-    writer = SummaryWriter(log_dir=hps.model_dir)
-    writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
+  logger = utils.get_logger(hps.model_dir)
+  logger.info(hps)
+  utils.check_git_hash(hps.model_dir)
+  writer = SummaryWriter(log_dir=hps.model_dir)
+  writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
 
   torch.manual_seed(hps.train.seed)
-  torch.cuda.set_device(rank)
+  torch.cuda.set_device(0)
 
   train_dataset = TextAudioSpeakerLoader(hps.data.training_files, hps)
   train_sampler = DistributedBucketSampler(
       train_dataset,
       hps.train.batch_size,
       [75,100,125,150,175,200,225,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,2000,3000,4000,5000],
-      num_replicas=n_gpus,
-      rank=rank,
+      num_replicas=1,
+      rank=0,
       shuffle=True)
   collate_fn = TextAudioSpeakerCollate(hps)
-  train_loader = DataLoader(train_dataset, num_workers=12, shuffle=False, pin_memory=True,
-      collate_fn=collate_fn, batch_sampler=train_sampler)
-  if rank == 0:
-    eval_dataset = TextAudioSpeakerLoader(hps.data.validation_files, hps)
-    eval_loader = DataLoader(eval_dataset, num_workers=2, shuffle=True,
-        batch_size=hps.train.batch_size, pin_memory=False,
-        drop_last=False, collate_fn=collate_fn)
+  train_loader = DataLoader(train_dataset, num_workers=12, shuffle=False, pin_memory=True, collate_fn=collate_fn, batch_sampler=train_sampler)
+  eval_dataset = TextAudioSpeakerLoader(hps.data.validation_files, hps)
+  eval_loader = DataLoader(eval_dataset, num_workers=2, shuffle=True, batch_size=hps.train.batch_size, pin_memory=False, drop_last=False, collate_fn=collate_fn)
 
   net_g = SynthesizerTrn(
       hps.data.filter_length // 2 + 1,
       hps.train.segment_size // hps.data.hop_length,
-      **hps.model).cuda(rank)
-  net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm).cuda(rank)
+      **hps.model).cuda()
+  net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm).cuda()
   optim_g = torch.optim.AdamW(
       net_g.parameters(), 
       hps.train.learning_rate, 
@@ -104,15 +87,12 @@ def run(rank, n_gpus, hps):
   scaler = GradScaler(enabled=hps.train.fp16_run)
 
   for epoch in range(epoch_str, hps.train.epochs + 1):
-    if rank==0:
-      train_and_evaluate(rank, epoch, hps, [net_g, net_d], [optim_g, optim_d], [scheduler_g, scheduler_d], scaler, [train_loader, eval_loader], logger, [writer, writer_eval])
-    else:
-      train_and_evaluate(rank, epoch, hps, [net_g, net_d], [optim_g, optim_d], [scheduler_g, scheduler_d], scaler, [train_loader, None], None, None)
+    train_and_evaluate(epoch, hps, [net_g, net_d], [optim_g, optim_d], [scheduler_g, scheduler_d], scaler, [train_loader, eval_loader], logger, [writer, writer_eval])
     scheduler_g.step()
     scheduler_d.step()
 
 
-def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loaders, logger, writers):
+def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, logger, writers):
   
   net_g, net_d = nets
   optim_g, optim_d = optims
@@ -129,12 +109,12 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   for batch_idx, items in enumerate(train_loader):
     if hps.model.use_spk:
       c, spec, y, spk = items
-      g = spk.cuda(rank, non_blocking=True)
+      g = spk.cuda(non_blocking=True)
     else:
       c, spec, y = items
       g = None
-    spec, y = spec.cuda(rank, non_blocking=True), y.cuda(rank, non_blocking=True)
-    c = c.cuda(rank, non_blocking=True)
+    spec, y = spec.cuda(non_blocking=True), y.cuda(non_blocking=True)
+    c = c.cuda(non_blocking=True)
     mel = spec_to_mel_torch(
           spec, 
           hps.data.filter_length, 
@@ -200,40 +180,38 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
     scaler.step(optim_g)
     scaler.update()
 
-    if rank==0:
-      if global_step % hps.train.log_interval == 0:
-        lr = optim_g.param_groups[0]['lr']
-        losses = [loss_disc, loss_gen, loss_fm, loss_mel, loss_kl,loss_emo]
-        logger.info('Train Epoch: {} [{:.0f}%]'.format(
-          epoch,
-          100. * batch_idx / len(train_loader)))
-        logger.info([x.item() for x in losses] + [global_step, lr])
-        
-        scalar_dict = {"loss/g/total": loss_gen_all, "loss/d/total": loss_disc_all, "learning_rate": lr, "grad_norm_d": grad_norm_d, "grad_norm_g": grad_norm_g}
-        scalar_dict.update({"loss/g/fm": loss_fm, "loss/g/mel": loss_mel, "loss/g/kl": loss_kl, "loss/g/emo": loss_emo})
+    if global_step % hps.train.log_interval == 0:
+      lr = optim_g.param_groups[0]['lr']
+      losses = [loss_disc, loss_gen, loss_fm, loss_mel, loss_kl,loss_emo]
+      logger.info('Train Epoch: {} [{:.0f}%]'.format(
+        epoch,
+        100. * batch_idx / len(train_loader)))
+      logger.info([x.item() for x in losses] + [global_step, lr])
+      
+      scalar_dict = {"loss/g/total": loss_gen_all, "loss/d/total": loss_disc_all, "learning_rate": lr, "grad_norm_d": grad_norm_d, "grad_norm_g": grad_norm_g}
+      scalar_dict.update({"loss/g/fm": loss_fm, "loss/g/mel": loss_mel, "loss/g/kl": loss_kl, "loss/g/emo": loss_emo})
 
-        scalar_dict.update({"loss/g/{}".format(i): v for i, v in enumerate(losses_gen)})
-        scalar_dict.update({"loss/d_r/{}".format(i): v for i, v in enumerate(losses_disc_r)})
-        scalar_dict.update({"loss/d_g/{}".format(i): v for i, v in enumerate(losses_disc_g)})
-        image_dict = { 
-            "slice/mel_org": utils.plot_spectrogram_to_numpy(y_mel[0].data.cpu().numpy()),
-            "slice/mel_gen": utils.plot_spectrogram_to_numpy(y_hat_mel[0].data.cpu().numpy()), 
-            "all/mel": utils.plot_spectrogram_to_numpy(mel[0].data.cpu().numpy()),
-        }
-        utils.summarize(
-          writer=writer,
-          global_step=global_step, 
-          images=image_dict,
-          scalars=scalar_dict)
+      scalar_dict.update({"loss/g/{}".format(i): v for i, v in enumerate(losses_gen)})
+      scalar_dict.update({"loss/d_r/{}".format(i): v for i, v in enumerate(losses_disc_r)})
+      scalar_dict.update({"loss/d_g/{}".format(i): v for i, v in enumerate(losses_disc_g)})
+      image_dict = { 
+          "slice/mel_org": utils.plot_spectrogram_to_numpy(y_mel[0].data.cpu().numpy()),
+          "slice/mel_gen": utils.plot_spectrogram_to_numpy(y_hat_mel[0].data.cpu().numpy()), 
+          "all/mel": utils.plot_spectrogram_to_numpy(mel[0].data.cpu().numpy()),
+      }
+      utils.summarize(
+        writer=writer,
+        global_step=global_step, 
+        images=image_dict,
+        scalars=scalar_dict)
 
-      if global_step % hps.train.eval_interval == 0:
-        evaluate(hps, net_g, eval_loader, writer_eval)
-        utils.save_checkpoint(net_g, optim_g, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, "G_{}.pth".format(global_step)))
-        utils.save_checkpoint(net_d, optim_d, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, "D_{}.pth".format(global_step)))
+    if global_step % hps.train.eval_interval == 0:
+      evaluate(hps, net_g, eval_loader, writer_eval)
+      utils.save_checkpoint(net_g, optim_g, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, "G_{}.pth".format(global_step)))
+      utils.save_checkpoint(net_d, optim_d, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, "D_{}.pth".format(global_step)))
     global_step += 1
   
-  if rank == 0:
-    logger.info('====> Epoch: {}'.format(epoch))
+  logger.info('====> Epoch: {}'.format(epoch))
 
  
 def evaluate(hps, generator, eval_loader, writer_eval):
