@@ -1,3 +1,5 @@
+"""Totally same as QuickVC-official."""
+
 import math
 import numpy as np
 import torch

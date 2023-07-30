@@ -1,3 +1,5 @@
+"""Totally (semantically) same as QuickVC-official."""
+
 import math
 import os
 import random
