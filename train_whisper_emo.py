@@ -79,6 +79,13 @@ def run(hps):
     scheduler_g.step()
     scheduler_d.step()
 
+    # Training finish
+    if global_step > hps.train.max_global_step:
+      utils.save_checkpoint(net_g, optim_g, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, f"G_{global_step}.pth"), global_step)
+      utils.save_checkpoint(net_d, optim_d, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, f"D_{global_step}.pth"), global_step)
+      print(f"global_step={global_step} (>{hps.train.max_global_step}), finished.")
+      return
+
 
 def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, logger, writers):
   
@@ -136,7 +143,10 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
         loss_mel = hps.train.c_mel       * F.l1_loss(y_hat_mel, y_mel)
         loss_kl  = hps.train.c_kl        * kl_loss(z_p, logs_q, m_p, logs_p, z_mask)
         loss_emo = 0.5 * hps.train.c_mel * F.l1_loss(emo_y_hat, emo_y)
-        loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl + loss_emo
+        if global_step < 100_000:
+          loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl
+        else:
+          loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl + loss_emo
     # G_Backward/Optim
     optim_g.zero_grad()
     scaler.scale(loss_gen_all).backward()

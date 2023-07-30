@@ -35,31 +35,9 @@ For ConsistencyEVC, use ppgemoconvert_exp.py to achieve voice conversion using p
 ### Train
 
 #### XVC (WEO unit)
-1. Preprocessing by running `generate_weo.py`.
-
-2. train w/o speaker consistency loss for 100k steps:
-
-change [this line](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/b5e8e984dffd5a12910d1846e25b128298933e40/train_whisper_emo.py#L214C11-L214C11) to 
-
-```python
-loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl# + loss_emo
-```
-
-run the py file:
-
-```bash
-python train_whisper_emo.py -c configs/cvc-whispers-multi.json     -m cvc-whispers-three
-```
-
-3. finetune w/ speaker consistency loss:
-
-change [this line](https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/blob/71cf17a5b65c12987ea7fba74d1d173ea1aae5cb/train_whisper_emo.py#L214) back to 
-
-run the py file:
-
-```bash
-python train_whisper_emo.py -c configs/cvc-whispers-three-emo.json -m cvc-whispers-three
-```
+1. Preprocessing: `python generate_weo.py`
+2. Train:    `python train_whisper_emo.py -c configs/cvc-whispers-multi.json     -m cvc-whispers-three`
+3. finetune: `python train_whisper_emo.py -c configs/cvc-whispers-three-emo.json -m cvc-whispers-three`
 
 #### EVC (PPG)
 1. Preprocessing by running `generate_ppg.py`

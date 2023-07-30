@@ -4,6 +4,7 @@
     "eval_interval": 2500,
     "seed": 1235,
     "epochs": 10000,
+    "max_global_step": 300000,
     "learning_rate": 2e-4,
     "betas": [0.8, 0.99],
     "eps": 1e-9,
@@ -17,7 +18,7 @@
     "c_kl": 1.0,
     "use_sr": false,
     "max_speclen": 300,
-    "port": "8006"
+    "port": "8001"
   },
   "data": {
     "training_files":"train.txt",

@@ -4,6 +4,7 @@
     "eval_interval": 6000,
     "seed": 1235,
     "epochs": 10000,
+    "max_global_step": 100000,
     "learning_rate": 2e-4,
     "betas": [0.8, 0.99],
     "eps": 1e-9,
