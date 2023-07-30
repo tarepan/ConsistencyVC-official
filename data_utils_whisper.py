@@ -17,8 +17,12 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         1) loads audio, speaker_id, text pairs
         2) normalizes text and converts them to sequences of integers
         3) computes spectrograms from audio files.
+    
+    NOTE: Mostly same as QuickVC-official, except for file names.
     """
     def __init__(self, audiopaths, hparams):
+        assert hparams.train.use_sr is False, "`hparams.train.use_sr=True` is deprecated."
+
         self.audiopaths = load_filepaths_and_text(audiopaths)
         self.max_wav_value = hparams.data.max_wav_value
         self.sampling_rate = hparams.data.sampling_rate
@@ -50,77 +54,25 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
     def get_audio(self, filename):
         audio, sampling_rate = load_wav_to_torch(filename)
         if sampling_rate != self.sampling_rate:
-            raise ValueError("{} SR doesn't match target {} SR,the audio is{}".format(
-                sampling_rate, self.sampling_rate,filename))
+            raise ValueError("{} SR doesn't match target {}".format(
+                sampling_rate, self.sampling_rate))
         audio_norm = audio / self.max_wav_value
         audio_norm = audio_norm.unsqueeze(0)
-        #spec_filename = filename.replace(".wav", ".spec.pt")
+
         spec_filename = filename.replace(".wav", ".f{}h{}w{}spec.pt".format(self.filter_length, self.hop_length, self.win_length))
         if os.path.exists(spec_filename):
-            try:
-                spec = torch.load(spec_filename)
-            except:
-                print(spec_filename)
-                spec = spectrogram_torch(audio_norm, self.filter_length,
-                    self.sampling_rate, self.hop_length, self.win_length,
-                    center=False)
-                spec = torch.squeeze(spec, 0)
-                torch.save(spec, spec_filename)
+            spec = torch.load(spec_filename)
         else:
-            print(spec_filename)
             spec = spectrogram_torch(audio_norm, self.filter_length,
                 self.sampling_rate, self.hop_length, self.win_length,
                 center=False)
             spec = torch.squeeze(spec, 0)
             torch.save(spec, spec_filename)
             
-        if self.use_spk:
-            spk_filename = filename.replace(".wav", ".npy")
-            spk_filename = spk_filename.replace("DUMMY", "dataset/spk")
-            spk = torch.from_numpy(np.load(spk_filename))
+        c_filename = filename.replace(".wav", "whisper.pt.npy")
+        c=torch.from_numpy(np.load(c_filename))
+        c=c.transpose(1,0)
         
-        if not self.use_sr:
-            c_filename = filename.replace(".wav", "whisper.pt.npy")
-            #c_filename = c_filename.replace("DUMMY", "dataset/wavlm")
-            #c = torch.load(c_filename).squeeze(0)
-            c=torch.from_numpy(np.load(c_filename))
-            c=c.transpose(1,0)
-        else:
-            i = random.randint(68,92)
-            '''
-            basename = os.path.basename(filename)[:-4]
-            spkname = basename[:4]
-            #print(basename, spkname)
-            with h5py.File(f"dataset/rs/wavlm/{spkname}/{i}.hdf5","r") as f:
-                c = torch.from_numpy(f[basename][()]).squeeze(0)
-            #print(c)
-            '''
-            c_filename = filename.replace(".wav", f"_{i}.pt")
-            c_filename = c_filename.replace("DUMMY", "dataset/sr/wavlm")
-            c = torch.load(c_filename).squeeze(0)
-            
-        # 2023.01.10 update: code below can deteriorate model performance
-        # I added these code during cleaning up, thinking that it can offer better performance than my provided checkpoints, but actually it does the opposite.
-        # What an act of 'adding legs to a snake'!
-        '''
-        lmin = min(c.size(-1), spec.size(-1))
-        spec, c = spec[:, :lmin], c[:, :lmin]
-        audio_norm = audio_norm[:, :lmin*self.hop_length]
-        _spec, _c, _audio_norm = spec, c, audio_norm
-        while spec.size(-1) < self.spec_len:
-            spec = torch.cat((spec, _spec), -1)
-            c = torch.cat((c, _c), -1)
-            audio_norm = torch.cat((audio_norm, _audio_norm), -1)
-        start = random.randint(0, spec.size(-1) - self.spec_len)
-        end = start + self.spec_len
-        spec = spec[:, start:end]
-        c = c[:, start:end]
-        audio_norm = audio_norm[:, start*self.hop_length:end*self.hop_length]
-        '''
-        
-        #if self.use_spk:
-        #    return c, spec, audio_norm, spk
-        #else:
         return c, spec, audio_norm
 
     def __getitem__(self, index):
@@ -132,6 +84,8 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
 
 class TextAudioSpeakerCollate():
     """ Zero-pads model inputs and targets
+
+    NOTE: Totally same as QuickVC-official.
     """
     def __init__(self, hps):
         self.hps = hps
@@ -208,6 +162,8 @@ class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
   
     It removes samples which are not included in the boundaries.
     Ex) boundaries = [b1, b2, b3] -> any x s.t. length(x) <= b1 or length(x) > b3 are discarded.
+
+    NOTE: Totally same as QuickVC-official.
     """
     def __init__(self, dataset, batch_size, boundaries, num_replicas=None, rank=None, shuffle=True):
         super().__init__(dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle)
