@@ -101,11 +101,10 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
   net_g.train()
   net_d.train()
 
-  for batch_idx, items in enumerate(train_loader):
+  for batch_idx, (c, spec, y) in enumerate(train_loader):
     # ==== step =========================================================================================================================================
 
     # Data
-    c, spec, y = items
     c, spec, y = c.cuda(non_blocking=True), spec.cuda(non_blocking=True), y.cuda(non_blocking=True)
 
     # Transform
@@ -135,9 +134,13 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
     with autocast(enabled=hps.train.fp16_run):
       # G_Forward
       _, y_d_hat_g, fmap_r, fmap_g = net_d(y, y_hat)
+      # Diff from QuickVC-official: emo
       emo_y_hat = net_g.enc_spk(y_hat_mel.transpose(1,2))
       # G_Loss
       with autocast(enabled=False):
+        # Diff from QuickVC-official:
+        #   - `0.5 * ` in loss_fm
+        #   - loss_emo
         loss_gen, losses_gen = generator_loss(y_d_hat_g)
         loss_fm  = 0.5                   * feature_loss(fmap_r, fmap_g)
         loss_mel = hps.train.c_mel       * F.l1_loss(y_hat_mel, y_mel)
@@ -189,11 +192,11 @@ def train_and_evaluate(epoch, hps, nets, optims, schedulers, scaler, loaders, lo
 
  
 def evaluate(hps, generator, eval_loader, writer_eval):
+    """NOTE: Totally (semantically) same as QuickVC-official."""
     generator.eval()
     with torch.no_grad():
       # Data
-      for batch_idx, items in enumerate(eval_loader):
-        c, spec, y = items
+      for c, spec, y in eval_loader:
         c, spec, y = c[:1].cuda(), spec[:1].cuda(), y[:1].cuda()
         break
       # Transform

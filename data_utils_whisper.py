@@ -52,23 +52,23 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         self.lengths = lengths
 
     def get_audio(self, filename):
+        # Audio - sr validated & normalized
         audio, sampling_rate = load_wav_to_torch(filename)
         if sampling_rate != self.sampling_rate:
-            raise ValueError("{} SR doesn't match target {}".format(
-                sampling_rate, self.sampling_rate))
+            raise ValueError("{} SR doesn't match target {}".format(sampling_rate, self.sampling_rate))
         audio_norm = audio / self.max_wav_value
         audio_norm = audio_norm.unsqueeze(0)
 
+        # Spec - load or in-place generation (w/ save)
         spec_filename = filename.replace(".wav", ".f{}h{}w{}spec.pt".format(self.filter_length, self.hop_length, self.win_length))
         if os.path.exists(spec_filename):
             spec = torch.load(spec_filename)
         else:
-            spec = spectrogram_torch(audio_norm, self.filter_length,
-                self.sampling_rate, self.hop_length, self.win_length,
-                center=False)
+            spec = spectrogram_torch(audio_norm, self.filter_length, self.sampling_rate, self.hop_length, self.win_length, center=False)
             spec = torch.squeeze(spec, 0)
             torch.save(spec, spec_filename)
-            
+
+        # Unit - WEO, load & reshape
         c_filename = filename.replace(".wav", "whisper.pt.npy")
         c=torch.from_numpy(np.load(c_filename))
         c=c.transpose(1,0)
