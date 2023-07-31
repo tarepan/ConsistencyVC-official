@@ -25,7 +25,11 @@ def load_model(path) -> Whisper:
     return model.to(device)
 
 
-def wave_to_weo(whisper: Whisper, wavPath, p_out: str):
+def wave_to_weo(whisper: Whisper, wavPath: str, p_out: str):
+    """Convert a waveform into Whisper Encoder Output (WEO) unit series.
+
+    WEO :: (Frame=t/320, Feat=) - Whisper Encoder Output, hop=320 (20 msec)
+    """
 
     # Hack for restriction, see issue#13 (https://github.com/ConsistencyVC/ConsistencyVC-voive-conversion/issues/13)
     audio, sr = librosa.load(wavPath, sr=None)
@@ -37,13 +41,16 @@ def wave_to_weo(whisper: Whisper, wavPath, p_out: str):
     # Load
     audio = load_audio(wavPath)
 
+    # Inference
     with torch.no_grad():
-        # Inference
+        # wave2mel :: (T=t,) -> -> (Freq=80, Frame=t/160) -> (B=1, Freq=80, Frame=t/160)
         mel = log_mel_spectrogram(audio).unsqueeze(0).to(whisper.device)
-        ppg = whisper.encoder(mel).squeeze().data.cpu().float().numpy()
-        ppg = ppg[:audio.shape[0] // 320,] # [length, dim=1024]
-        # Output
-        np.save(p_out, ppg, allow_pickle=False)
+        # mel2unit :: (B=1, Freq=80, Frame=t/160) -> (B=1, Frame=t/320, Feat) -> (Frame=t/320, Feat)
+        unit = whisper.encoder(mel).squeeze().data.cpu().float().numpy()
+        unit = unit[:audio.shape[0] // 320,] # [length, dim=1024]
+
+    # Output
+    np.save(p_out, unit, allow_pickle=False)
 
 
 if __name__ == "__main__":

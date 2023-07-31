@@ -159,9 +159,9 @@ class AudioEncoder(nn.Module):
     def forward(self, x: Tensor):
         """
         Args:
-            x :: (B, Freq=n_mels, Frame) - mel-spectrogram of the audio
+            x :: (B, Freq=n_mels, Frame=frm) - mel-spectrogram of the audio
         Returns:
-              :: ()
+              :: (B, Frame=frm/2, Feat)
         """
 
         # PreNet :: (B, Freq=n_mels, Frame=frm) -> (B, Frame=frm/2, Feat=n_state) - Conv-GeLU-Conv-GeLU
