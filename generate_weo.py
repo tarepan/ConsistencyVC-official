@@ -19,7 +19,7 @@ def load_model(path) -> Whisper:
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     checkpoint = torch.load(path, map_location=device)
-    dims = ModelDimensions(**checkpoint["dims"])
+    dims = ModelDimensions(**checkpoint["dims"]) # Parameters
     model = Whisper(dims)
     model.load_state_dict(checkpoint["model_state_dict"])
     return model.to(device)

@@ -44,8 +44,12 @@ class Conv1d(nn.Conv1d):
         )
 
 
-def sinusoids(length, channels, max_timescale=10000):
-    """Returns sinusoids for positional embedding"""
+def sinusoids(length: int, channels: int, max_timescale=10000):
+    """Returns sinusoids for positional embedding
+    
+    Returns:
+        :: (Frame=length, Feat=channels)
+    """
     assert channels % 2 == 0
     log_timescale_increment = np.log(max_timescale) / (channels // 2 - 1)
     inv_timescales = torch.exp(-log_timescale_increment * torch.arange(channels // 2))
@@ -121,18 +125,30 @@ class ResidualAttentionBlock(nn.Module):
         mask: Optional[Tensor] = None,
         kv_cache: Optional[dict] = None,
     ):
+        """
+        Args:
+            x :: (B, Frame, Feat) - Input feature series
+        """
+        # Attn - Res[LN-Attn]
         x = x + self.attn(self.attn_ln(x), mask=mask, kv_cache=kv_cache)[0]
         if self.cross_attn:
             x = x + self.cross_attn(self.cross_attn_ln(x), xa, kv_cache=kv_cache)[0]
+        # FF - Res[LN-FC-GeLU-FC]
         x = x + self.mlp(self.mlp_ln(x))
         return x
 
 
 class AudioEncoder(nn.Module):
+    """Whisper Encoder, directly used for CVC-XVC."""
     def __init__(self, n_mels: int, n_ctx: int, n_state: int, n_head: int, n_layer: int):
+        """
+        Args:
+            n_ctx - Positional embedding frame length (this limit input length)
+        """
         super().__init__()
-        self.conv1 = Conv1d(n_mels, n_state, kernel_size=3, padding=1)
+        self.conv1 = Conv1d(n_mels,  n_state, kernel_size=3,           padding=1)
         self.conv2 = Conv1d(n_state, n_state, kernel_size=3, stride=2, padding=1)
+        # positional_embedding :: (Frame=n_ctx, Feat=n_state)
         self.register_buffer("positional_embedding", sinusoids(n_ctx, n_state))
 
         self.blocks: Iterable[ResidualAttentionBlock] = nn.ModuleList(
@@ -142,23 +158,31 @@ class AudioEncoder(nn.Module):
 
     def forward(self, x: Tensor):
         """
-        x : torch.Tensor, shape = (batch_size, n_mels, n_ctx)
-            the mel spectrogram of the audio
+        Args:
+            x :: (B, Freq=n_mels, Frame) - mel-spectrogram of the audio
+        Returns:
+              :: ()
         """
+
+        # PreNet :: (B, Freq=n_mels, Frame=frm) -> (B, Frame=frm/2, Feat=n_state) - Conv-GeLU-Conv-GeLU
         x = F.gelu(self.conv1(x))
         x = F.gelu(self.conv2(x))
         x = x.permute(0, 2, 1)
 
+        # Positional encoding
         len_x = x.shape[1]
         len_e = self.positional_embedding.shape[0]
         assert len_x <= len_e, "incorrect audio shape"
         pos_e = self.positional_embedding[:len_x, :]
         x = (x + pos_e).to(x.dtype)
 
+        # MainNet :: (B, Frame=frm/2, Feat=n_state) -> (B, Frame=frm/2, Feat=n_state)
         for block in self.blocks:
             x = block(x)
 
+        # PostNet - LN
         x = self.ln_post(x)
+
         return x
 
 
@@ -198,23 +222,12 @@ class TextDecoder(nn.Module):
 
 
 class Whisper(nn.Module):
+    """Main Whisper model."""
     def __init__(self, dims: ModelDimensions):
         super().__init__()
         self.dims = dims
-        self.encoder = AudioEncoder(
-            self.dims.n_mels,
-            self.dims.n_audio_ctx,
-            self.dims.n_audio_state,
-            self.dims.n_audio_head,
-            self.dims.n_audio_layer,
-        )
-        self.decoder = TextDecoder(
-            self.dims.n_vocab,
-            self.dims.n_text_ctx,
-            self.dims.n_text_state,
-            self.dims.n_text_head,
-            self.dims.n_text_layer,
-        )
+        self.encoder = AudioEncoder(self.dims.n_mels, self.dims.n_audio_ctx, self.dims.n_audio_state, self.dims.n_audio_head, self.dims.n_audio_layer)
+        self.decoder =  TextDecoder(self.dims.n_vocab, self.dims.n_text_ctx,  self.dims.n_text_state,  self.dims.n_text_head,  self.dims.n_text_layer)
 
     def embed_audio(self, mel: torch.Tensor):
         return self.encoder(mel)
